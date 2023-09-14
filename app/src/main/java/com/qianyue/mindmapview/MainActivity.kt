@@ -4,6 +4,7 @@ import android.graphics.Color
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.view.View
+import android.widget.ImageView
 import android.widget.TextView
 import com.qianyue.mindmapview.model.MindMapNode
 import com.qianyue.mindmapview.util.NodeAdapter
@@ -55,6 +56,11 @@ class MainActivity : AppCompatActivity() {
 
     inner class MindAdapter : NodeAdapter<String>() {
         override fun getView(view: View?, level: Int, posInLevel: Int, t: String): View {
+            if (level == 2 && posInLevel == 1) {
+                return ImageView(this@MainActivity).apply {
+                    setImageResource(R.mipmap.ic_launcher)
+                }
+            }
             if (view != null) {
                 (view as TextView).text = t
                 return view

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="mind_map_line_stroke_width">2dp</dimen>
+    <dimen name="mind_map_line_corner_radius">8dp</dimen>
+    <dimen name="mind_map_node_hor_space">30dp</dimen>
+    <dimen name="mind_map_node_ver_space">30dp</dimen>
+</resources>

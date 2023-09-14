@@ -2,8 +2,6 @@ package com.qianyue.mindmapview
 
 import android.content.Context
 import android.graphics.Canvas
-import android.graphics.Color
-import android.graphics.Paint
 import android.util.AttributeSet
 import android.view.View
 import android.view.ViewGroup
@@ -40,20 +38,24 @@ class MindMapView @JvmOverloads constructor(
 
     private val _cacheView: MutableMap<MindMapNode<*>, View> = mutableMapOf()
 
-    private val _linePaint: Paint = Paint().apply {
-        strokeWidth = 4f
-        color = Color.BLUE
-    }
-
     var adapter: NodeAdapter<*>? = null
         set(value) {
             field = value
             value?.observer = Observer()
         }
 
-    var itemInterval = 32
+    var nodeVerSpace = context.resources.getDimensionPixelOffset(R.dimen.mind_map_node_ver_space)
 
-    var horizonInterval = 120
+    var nodeHorSpace = context.resources.getDimensionPixelOffset(R.dimen.mind_map_node_hor_space)
+
+    var nodeLinePainter: NodeLinePainter? = DefaultLinePainter(context)
+        set(value) {
+            val change = field != value
+            field = value
+            if (change) {
+                invalidate()
+            }
+        }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         super.onMeasure(widthMeasureSpec, heightMeasureSpec)
@@ -113,10 +115,10 @@ class MindMapView @JvmOverloads constructor(
             addView(view)
 
             currentParent?.let {
-                it.childrenHeight += (tempNode.placeHeight + itemInterval)
+                it.childrenHeight += (tempNode.placeHeight + nodeVerSpace)
                 tempNode.saveOldPlaceHeight()
                 if (it.children!!.last() == tempNode) {
-                    it.childrenHeight -= itemInterval
+                    it.childrenHeight -= nodeVerSpace
 
                     var tempParent = it.parent
                     var tempChild = it
@@ -160,7 +162,7 @@ class MindMapView @JvmOverloads constructor(
             if (nodeIndex == 0) parentNode.layoutConsumed = 0
 
 
-            val left = parentView.right + horizonInterval
+            val left = parentView.right + nodeHorSpace
             val vCenter = parentView.top + parentView.measuredHeight / 2
             val top = vCenter - (parentNode.placeHeight / 2) + parentNode.layoutConsumed
 
@@ -180,7 +182,7 @@ class MindMapView @JvmOverloads constructor(
                 )
             }
             else tempView.layout(left, top, left + tempView.measuredWidth, top + tempView.measuredHeight)
-            parentNode.layoutConsumed += (if (nodeIndex != (parentNode.children!!.size - 1)) tempNode.placeHeight + itemInterval else tempNode.placeHeight)
+            parentNode.layoutConsumed += (if (nodeIndex != (parentNode.children!!.size - 1)) tempNode.placeHeight + nodeVerSpace else tempNode.placeHeight)
 
             _tempQueue.addAll(tempNode.children ?: emptyList())
         }
@@ -191,9 +193,6 @@ class MindMapView @JvmOverloads constructor(
         val rootView = _cacheView[rootNode] ?: return
         canvas ?: return
 
-        canvas.drawLine(0f, (rootView.top + rootView.measuredHeight / 2 + rootNode.placeHeight / 2).toFloat(), 1500f, (rootView.top + rootView.measuredHeight / 2 + rootNode.placeHeight / 2).toFloat(), _linePaint)
-        canvas.drawLine(0f, (rootView.top + rootView.measuredHeight / 2 - rootNode.placeHeight / 2).toFloat(), 1500f, (rootView.top + rootView.measuredHeight / 2 - rootNode.placeHeight / 2).toFloat(), _linePaint)
-
         _tempQueue.addAll(rootNode.children ?: emptyList())
         while (_tempQueue.isNotEmpty()) {
             val tempNode = _tempQueue.pop()
@@ -201,13 +200,7 @@ class MindMapView @JvmOverloads constructor(
             val parentNode = tempNode.parent
             val parentView = _cacheView[parentNode] as View
 
-            canvas.drawLine(
-                tempView.left.toFloat(),
-                (tempView.top + tempView.measuredHeight / 2).toFloat(),
-                parentView.right.toFloat(),
-                (parentView.top + parentView.measuredHeight / 2).toFloat(),
-                _linePaint
-            )
+            nodeLinePainter?.drawLine(canvas, tempView, parentView)
 
             _tempQueue.addAll(tempNode.children ?: emptyList())
         }
