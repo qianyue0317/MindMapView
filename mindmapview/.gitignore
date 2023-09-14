@@ -1,0 +1,9 @@
+/build
+/.idea
+/.idea/.aws.xml
+/.idea/compiler.xml
+/.idea/gradle.xml
+/.idea/kotlinc.xml
+/.idea/misc.xml
+/.idea/workspace.xml
+/app/build
