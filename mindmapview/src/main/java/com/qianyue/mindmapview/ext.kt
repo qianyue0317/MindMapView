@@ -20,3 +20,10 @@ fun PointF.distance(other: PointF): Double {
 fun Point.distance(otherX: Int, otherY: Int): Double {
     return sqrt(((otherX - x) * (otherX - x) + (otherY - y) * (otherY - y)).toDouble())
 }
+
+
+
+fun PointF.distance(otherX: Float, otherY: Float): Double {
+    return sqrt(((otherX - x) * (otherX - x) + (otherY - y) * (otherY - y)).toDouble())
+}
+

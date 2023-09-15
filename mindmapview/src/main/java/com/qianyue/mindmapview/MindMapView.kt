@@ -162,6 +162,7 @@ class MindMapView @JvmOverloads constructor(
 
         _mindContentSize[0] = expectedWidth
         _mindContentSize[1] = rootNode.placeHeight
+        // 尺寸完全自适应，节点占多少，自身就占多少
         super.onMeasure(MeasureSpec.makeMeasureSpec(_mindContentSize[0], MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(_mindContentSize[1], MeasureSpec.EXACTLY))
     }
 

@@ -2,19 +2,16 @@ package com.qianyue.mindmapview
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.Matrix
-import android.graphics.Paint
-import android.graphics.Point
 import android.graphics.PointF
 import android.util.AttributeSet
-import android.util.Log
 import android.view.MotionEvent
 import android.view.ViewConfiguration
 import android.widget.FrameLayout
 import androidx.core.view.forEach
 import kotlin.math.abs
+import kotlin.math.max
+import kotlin.math.min
 
 /**
  * @author QianYue
@@ -30,10 +27,14 @@ class MindMapContainerView @JvmOverloads constructor(
         setWillNotDraw(false)
     }
 
+    var maxScaleFactor = 3f
+
+    var minScaleFactor = 0.2f
+
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
 
-    private var lastPoint: Point = Point(0, 0)
-    private var downPoint: Point = Point(0, 0)
+    private var lastPoint: PointF = PointF(0f, 0f)
+    private var downPoint: PointF = PointF(0f, 0f)
 
     private var isDragging: Boolean = false
     private var isScaling: Boolean = false
@@ -46,25 +47,22 @@ class MindMapContainerView @JvmOverloads constructor(
     private val lastPointer0: PointF = PointF(0f, 0f)
     private val lastPointer1: PointF = PointF(0f, 0f)
 
-    private var lastPointerId0 = -1
-    private var lastPointerId1 = -1
-
     private var distanceBetweenPointer = 0f
 
     override fun onInterceptTouchEvent(ev: MotionEvent?): Boolean {
         when (ev?.actionMasked ?: return false) {
             MotionEvent.ACTION_DOWN -> {
-                downPoint.x = ev.x.toInt()
-                downPoint.y = ev.y.toInt()
+                downPoint.x = ev.x
+                downPoint.y = ev.y
                 lastPoint.set(downPoint.x, downPoint.y)
             }
 
             MotionEvent.ACTION_MOVE -> {
                 lastPoint.apply {
-                    x = ev.x.toInt()
-                    y = ev.y.toInt()
+                    x = ev.x
+                    y = ev.y
                 }
-                if (!isDragging && downPoint.distance(ev.x.toInt(), ev.y.toInt()) > touchSlop) {
+                if (!isDragging && downPoint.distance(ev.x, ev.y) > touchSlop) {
                     isDragging = true
                     return true
                 }
@@ -88,14 +86,14 @@ class MindMapContainerView @JvmOverloads constructor(
 
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(ev: MotionEvent?): Boolean {
-        var offsetLR = 0
-        var offsetTB = 0
+        var offsetLR = 0f
+        var offsetTB = 0f
         var changeScale = false
 
         when (ev!!.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
-                downPoint.x = ev.x.toInt()
-                downPoint.y = ev.y.toInt()
+                downPoint.x = ev.x
+                downPoint.y = ev.y
                 lastPoint.set(downPoint.x, downPoint.y)
             }
 
@@ -104,22 +102,18 @@ class MindMapContainerView @JvmOverloads constructor(
                 val dx = ev.x - lastPoint.x
                 val dy = ev.y - lastPoint.y
 
-                lastPoint.apply {
-                    x = ev.x.toInt()
-                    y = ev.y.toInt()
-                }
                 if (!isScaling && !isDragging && downPoint.distance(
-                        ev.x.toInt(),
-                        ev.y.toInt()
+                        ev.x,
+                        ev.y
                     ) > touchSlop
                 ) {
                     isDragging = true
                 }
 
-                if (isDragging) {
+                if (isDragging && lastPoint.x > 0) {
                     matrix.postTranslate(dx, dy)
-                    offsetLR = dx.toInt()
-                    offsetTB = dy.toInt()
+                    offsetLR = dx
+                    offsetTB = dy
                 }
 
                 if (isScaling) {
@@ -128,12 +122,22 @@ class MindMapContainerView @JvmOverloads constructor(
                         matrix.getValues(matrixValues).let { matrixValues }[Matrix.MSCALE_X]
                     val distance = distanceBetweenPointer
                     resetCenterPoint(ev)
+                    val newScale = min(
+                        max((distanceBetweenPointer / distance) * oldScale, minScaleFactor),
+                        maxScaleFactor
+                    )
+                    val postScale = newScale / oldScale
                     matrix.postScale(
-                        oldScale * (distanceBetweenPointer / distance) / oldScale,
-                        oldScale * (distanceBetweenPointer / distance) / oldScale,
+                        postScale,
+                        postScale,
                         scaleCenterPointer.x,
                         scaleCenterPointer.y
                     )
+                }
+
+                lastPoint.apply {
+                    x = ev.x
+                    y = ev.y
                 }
             }
 
@@ -158,6 +162,9 @@ class MindMapContainerView @JvmOverloads constructor(
                     }
 
                     2 -> {
+                        // 两指变一指，防止跳动
+                        lastPoint.x = -1f
+                        lastPoint.y = -1f
                         isDragging = true
                         isScaling = false
                     }
@@ -187,20 +194,7 @@ class MindMapContainerView @JvmOverloads constructor(
             it.translationX = matrixValues[Matrix.MTRANS_X]
             it.translationY = matrixValues[Matrix.MTRANS_Y]
         }
-        invalidate()
         return true
-    }
-
-    val paint = Paint().apply {
-        setColor(Color.BLUE)
-        style = Paint.Style.FILL
-    }
-
-    override fun onDraw(canvas: Canvas?) {
-        canvas?.save()
-        canvas?.concat(matrix)
-        canvas?.drawCircle(400f, 700f, 60f, paint)
-        canvas?.restore()
     }
 
     private fun resetCenterPoint(ev: MotionEvent) {
@@ -211,16 +205,12 @@ class MindMapContainerView @JvmOverloads constructor(
 
         scaleCenterPointer.x = x0 + (x1 - x0) / 2
         scaleCenterPointer.y = y0 + (y1 - y0) / 2
-        Log.i("qianyueqianyue", "${scaleCenterPointer.x},${scaleCenterPointer.y}")
 
         lastPointer0.x = x0
         lastPointer0.y = y0
 
         lastPointer1.x = x1
         lastPointer1.y = y1
-
-//        lastPointerId0 = ev.getPointerId(0)
-//        lastPointerId1 = ev.getPointerId(1)
 
         distanceBetweenPointer = lastPointer0.distance(lastPointer1).toFloat()
     }
