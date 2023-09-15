@@ -14,15 +14,17 @@
         android:layout_weight="1"
         android:background="#7EE6B1"
         android:padding="16dp"
-        app:verSpace="24dp"
-        app:horSpace="40dp"/>
+        app:verSpace="12dp"
+        app:horSpace="30dp"/>
 
     <com.qianyue.mindmapview.MindMapContentView
         android:id="@+id/mind_content_view"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         app:horSpace="60dp"
+        app:verSpace="12dp"
         android:layout_gravity="center"
+        android:layout_marginTop="16dp"
         android:layout_weight="1" />
 
 

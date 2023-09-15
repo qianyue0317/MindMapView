@@ -46,12 +46,16 @@ class MainActivity : AppCompatActivity() {
 //        mindView.setContentGravity(Gravity.START)
         // 设置缩放到父容器大小，类似ImageView的 FIT_CENTER
 //        mindView.fitCenter()
+        // 设置是否可缩放、移动
+//        mindView.enableTouch = false
 
+        // <editor-fold desc="这里是使用原始的导图控件，没有触摸事件处理，用户也可以自行定义容器，参考MindMapView">
         val root2 = fakeData2()
         val adapter2 = MindAdapter()
         adapter2.root = root2
         val mindContentView = findViewById<MindMapContentView>(R.id.mind_content_view)
         mindContentView.adapter = adapter2
+        // </editor-fold>
 
 //        mindView.postDelayed({
 //                             mindView.fitScale()
@@ -122,7 +126,7 @@ class MainActivity : AppCompatActivity() {
 
     inner class MindAdapter : NodeAdapter<String>() {
         override fun getView(view: View?, level: Int, posInLevel: Int, t: String): View {
-            if (level == 2 && posInLevel == 1) {
+            if (level == 2 && posInLevel == 2) {
                 return ImageView(this@MainActivity).apply {
                     setImageResource(R.mipmap.ic_launcher)
                 }
