@@ -1,251 +1,286 @@
 package com.qianyue.mindmapview
 
+import android.annotation.SuppressLint
 import android.content.Context
-import android.graphics.Canvas
-import android.graphics.Rect
+import android.graphics.Matrix
+import android.graphics.PointF
 import android.util.AttributeSet
-import android.view.View
-import android.view.ViewGroup
-import com.qianyue.mindmapview.model.MindMapNode
+import android.view.Gravity
+import android.view.MotionEvent
+import android.view.ViewConfiguration
+import android.widget.FrameLayout
+import androidx.core.view.forEach
+import androidx.core.view.updateLayoutParams
 import com.qianyue.mindmapview.util.NodeAdapter
-import java.util.LinkedList
+import kotlin.math.abs
 import kotlin.math.max
+import kotlin.math.min
 
 /**
+ * 支持触摸事件的容器
+ *
  * @author QianYue
- * @since 2023/9/6
+ * @since 2023/9/14
  */
 class MindMapView @JvmOverloads constructor(
     context: Context,
     attributeSet: AttributeSet? = null,
     defStyle: Int = 0
-) : ViewGroup(context, attributeSet, defStyle) {
+) : FrameLayout(context, attributeSet, defStyle) {
+
+    private val mindMapContentView: MindMapContentView
 
     init {
         setWillNotDraw(false)
-    }
-
-    companion object {
-        // 摆放在左侧
-        const val MODE_LEFT = 1
-
-        // 摆放在右侧
-        const val MODE_RIGHT = 2
-
-        // 摆放在两侧
-        const val MODE_BOTH = 3
-    }
-
-    private val _tempQueue: LinkedList<MindMapNode<*>> = LinkedList()
-
-    private val _cacheView: MutableMap<MindMapNode<*>, View> = mutableMapOf()
-
-    private val _mindContentRegion = Rect()
-
-    // 所有节点占的总大小，宽高
-    private val _mindContentSize = arrayOf(0, 0)
-
-    var adapter: NodeAdapter<*>? = null
-        set(value) {
-            field = value
-            value?.observer = Observer()
-        }
-
-    var nodeVerSpace = context.resources.getDimensionPixelOffset(R.dimen.mind_map_node_ver_space)
-        set(value) {
-            val change = field != value
-            field = value
-            if (change) {
-                requestLayout()
-            }
-        }
-
-    var nodeHorSpace = context.resources.getDimensionPixelOffset(R.dimen.mind_map_node_hor_space)
-        set(value) {
-            val change = field != value
-            field = value
-            if (change) {
-                requestLayout()
-            }
-        }
-
-    var nodeLinePainter: NodeLinePainter? = DefaultLinePainter(context)
-        set(value) {
-            val change = field != value
-            field = value
-            if (change) {
-                invalidate()
-            }
-        }
-
-    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        removeAllViews()
-
-        adapter ?: return
-        adapter!!.root ?: return
-
-        _tempQueue.clear()
-
-        // 测量子节点
-        val rootNode = adapter!!.root!!
-        rootNode.leftOrRight = 0
-        var currentLevel = -1
-        var posIndexInLevel = -1
-        var currentParent: MindMapNode<*>? = null
-
-        var expectedWidth = 0
-
-        _tempQueue.offer(rootNode)
-
-        while (_tempQueue.isNotEmpty()) {
-            val tempNode = _tempQueue.pop()
-            tempNode.reset()
-            currentParent = tempNode.parent
-            tempNode.level = tempNode.parent?.let { it.level + 1 } ?: 0
-            if (tempNode.level != currentLevel) posIndexInLevel = 0 else posIndexInLevel++
-            currentLevel = tempNode.level
-            tempNode.posInLevel = posIndexInLevel
-            if (tempNode.level == 0 && tempNode != rootNode) {
-                // 只有根节点的root可空
-                throw RuntimeException("only root node's parent field can be null")
-            }
-
-
-            // TODO: 展开收起处理
-//            if (!tempNode.expanded) continue0
-
-            val view =
-                adapter!!.getView(_cacheView[tempNode], currentLevel, posIndexInLevel, tempNode)
-                    .also { _cacheView[tempNode] = it }
-            view.setTag(R.id.mind_node_tag, tempNode)
-            view.measure(
-                MeasureSpec.makeMeasureSpec(Int.MAX_VALUE shr 2, MeasureSpec.AT_MOST),
-                MeasureSpec.makeMeasureSpec(Int.MAX_VALUE shr 2, MeasureSpec.AT_MOST),
+        clipChildren = false
+        clipToPadding = false
+        var nodeHorSpace =
+            context.resources.getDimensionPixelOffset(R.dimen.mind_map_node_hor_space)
+        var nodeVerSpace =
+            context.resources.getDimensionPixelOffset(R.dimen.mind_map_node_ver_space)
+        attributeSet?.let {
+            val typedArray = context.obtainStyledAttributes(attributeSet, R.styleable.MindMapView)
+            nodeHorSpace = typedArray.getDimensionPixelOffset(
+                R.styleable.MindMapView_horSpace, nodeHorSpace
             )
-            tempNode.selfHeight = view.measuredHeight
-            view.visibility = if (tempNode.isExpanded()) View.VISIBLE else View.GONE
-            addView(view)
+            nodeVerSpace = typedArray.getDimensionPixelOffset(
+                R.styleable.MindMapView_verSpace,
+                nodeVerSpace
+            )
+            typedArray.recycle()
+        }
 
-            currentParent?.let {
-                it.childrenHeight += (tempNode.placeHeight + nodeVerSpace)
-                tempNode.saveOldPlaceHeight()
-                if (it.children!!.last() == tempNode) {
-                    it.childrenHeight -= nodeVerSpace
+        mindMapContentView = MindMapContentView(context).apply {
+            this.nodeHorSpace = nodeHorSpace
+            this.nodeVerSpace = nodeVerSpace
+        }
+        addView(
+            mindMapContentView,
+            LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT, Gravity.CENTER)
+        )
+    }
 
-                    var tempParent = it.parent
-                    var tempChild = it
-                    while (tempParent != null) {
-                        tempParent.childrenHeight -= tempChild.oldPlaceHeight
-                        tempParent.childrenHeight += tempChild.placeHeight
-                        tempChild.saveOldPlaceHeight()
-                        tempChild = tempParent
-                        tempParent = tempParent.parent
+    fun setHorSpace(horSpace: Int) {
+        mindMapContentView.nodeHorSpace = horSpace
+    }
+
+    fun setVerSpace(verSpace: Int) {
+        mindMapContentView.nodeVerSpace = verSpace
+    }
+
+    var maxScaleFactor = 3f
+
+    var minScaleFactor = 0.2f
+
+    private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
+
+    private var lastPoint: PointF = PointF(0f, 0f)
+    private var downPoint: PointF = PointF(0f, 0f)
+
+    private var isDragging: Boolean = false
+    private var isScaling: Boolean = false
+
+    private val matrix: Matrix = Matrix()
+    private val matrixValues = floatArrayOf(0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f)
+
+    private val scaleCenterPointer = PointF()
+
+    private val lastPointer0: PointF = PointF(0f, 0f)
+    private val lastPointer1: PointF = PointF(0f, 0f)
+
+    private var distanceBetweenPointer = 0f
+
+    fun <T> setAdapter(nodeAdapter: NodeAdapter<T>) {
+        mindMapContentView.adapter = nodeAdapter
+    }
+
+    fun setContentGravity(gravity: Int) {
+        mindMapContentView.updateLayoutParams<LayoutParams> {
+            this.gravity = gravity
+        }
+    }
+
+    override fun onInterceptTouchEvent(ev: MotionEvent?): Boolean {
+        when (ev?.actionMasked ?: return false) {
+            MotionEvent.ACTION_DOWN -> {
+                downPoint.x = ev.x
+                downPoint.y = ev.y
+                lastPoint.set(downPoint.x, downPoint.y)
+            }
+
+            MotionEvent.ACTION_MOVE -> {
+                lastPoint.apply {
+                    x = ev.x
+                    y = ev.y
+                }
+                if (!isDragging && downPoint.distance(ev.x, ev.y) > touchSlop) {
+                    isDragging = true
+                    return true
+                }
+            }
+
+            MotionEvent.ACTION_POINTER_DOWN -> {
+                if (ev.pointerCount == 2) {
+                    // scaling
+                    isScaling = true
+                    resetCenterPoint(ev)
+                    isDragging = false
+                } else {
+                    isScaling = false
+                    isDragging = false
+                }
+                return true
+            }
+        }
+        return false
+    }
+
+    @SuppressLint("ClickableViewAccessibility")
+    override fun onTouchEvent(ev: MotionEvent?): Boolean {
+        var offsetLR = 0f
+        var offsetTB = 0f
+        var changeScale = false
+
+        when (ev!!.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                downPoint.x = ev.x
+                downPoint.y = ev.y
+                lastPoint.set(downPoint.x, downPoint.y)
+            }
+
+            MotionEvent.ACTION_MOVE -> {
+
+                val dx = ev.x - lastPoint.x
+                val dy = ev.y - lastPoint.y
+
+                if (!isScaling && !isDragging && downPoint.distance(
+                        ev.x,
+                        ev.y
+                    ) > touchSlop
+                ) {
+                    isDragging = true
+                }
+
+                if (isDragging && lastPoint.x > 0) {
+                    matrix.postTranslate(dx, dy)
+                    offsetLR = dx
+                    offsetTB = dy
+                }
+
+                if (isScaling) {
+                    changeScale = true
+                    val oldScale =
+                        matrix.getValues(matrixValues).let { matrixValues }[Matrix.MSCALE_X]
+                    val distance = distanceBetweenPointer
+                    resetCenterPoint(ev)
+                    val newScale = min(
+                        max((distanceBetweenPointer / distance) * oldScale, minScaleFactor),
+                        maxScaleFactor
+                    )
+                    val postScale = newScale / oldScale
+                    matrix.postScale(
+                        postScale,
+                        postScale,
+                        scaleCenterPointer.x,
+                        scaleCenterPointer.y
+                    )
+                }
+
+                lastPoint.apply {
+                    x = ev.x
+                    y = ev.y
+                }
+            }
+
+            MotionEvent.ACTION_POINTER_DOWN -> {
+                if (ev.pointerCount == 2) {
+                    // scaling
+                    isScaling = true
+                    resetCenterPoint(ev)
+                    isDragging = false
+                } else {
+                    isScaling = false
+                    isDragging = false
+                }
+            }
+
+            MotionEvent.ACTION_POINTER_UP -> {
+                when (ev.pointerCount) {
+                    3 -> {
+                        isDragging = false
+                        isScaling = true
+                        resetCenterPoint(ev)
+                    }
+
+                    2 -> {
+                        // 两指变一指，防止跳动
+                        lastPoint.x = -1f
+                        lastPoint.y = -1f
+                        isDragging = true
+                        isScaling = false
+                    }
+
+                    else -> {
+                        isDragging = false
+                        isScaling = false
                     }
                 }
             }
 
-            // <editor-fold desc="测出导图内容宽度">
-            if (tempNode.isLeaf()) {
-                var node = tempNode
-                var width = 0
-                while (node != null) {
-                    width += (_cacheView[node]!!.measuredWidth + nodeHorSpace)
-                    node = node.parent
-                }
-                width -= nodeHorSpace
-                expectedWidth = max(width, expectedWidth)
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                resetFlags()
             }
-            // </editor-fold>
-
-            tempNode.children?.takeIf { it.isNotEmpty() }?.let { _tempQueue.addAll(it) }
         }
 
-        _mindContentSize[0] = expectedWidth
-        _mindContentSize[1] = rootNode.placeHeight
-        // 尺寸完全自适应，节点占多少，自身就占多少
-        super.onMeasure(MeasureSpec.makeMeasureSpec(_mindContentSize[0], MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(_mindContentSize[1], MeasureSpec.EXACTLY))
+        if (abs(offsetLR) > 0 || abs(offsetTB) > 0) mindMapContentView.let {
+            it.translationX += (offsetLR)
+            it.translationY += (offsetTB)
+        }
+
+        if (changeScale) mindMapContentView.let {
+            it.pivotX = 0f
+            it.pivotY = 0f
+            it.scaleX = matrix.getValues(matrixValues).let { matrixValues }[Matrix.MSCALE_X]
+            it.scaleY = matrixValues[Matrix.MSCALE_Y]
+            it.translationX = matrixValues[Matrix.MTRANS_X]
+            it.translationY = matrixValues[Matrix.MTRANS_Y]
+        }
+        return true
     }
 
-
-
-    override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) {
-        val vCenter = measuredHeight / 2
-        val hCenter = measuredWidth / 2
-
-        // TODO: 还没有处理padding
-
-        _tempQueue.clear()
-
-        val rootNode = adapter?.root ?: return
-        val rootView = _cacheView[rootNode] ?: return
-        // 根节点
-        val rootLeft = (measuredWidth - _mindContentSize[0]) / 2
-        rootView.layout(
-            rootLeft,
-            vCenter - rootView.measuredHeight / 2,
-            rootLeft + rootView.measuredWidth,
-            vCenter + rootView.measuredHeight / 2
-        )
-
-        _tempQueue.addAll(rootNode.children ?: emptyList())
-        while (_tempQueue.isNotEmpty()) {
-            val tempNode = _tempQueue.pop()
-            val tempView = _cacheView[tempNode] as View
-            val parentNode = tempNode.parent
-            val parentView = _cacheView[parentNode] as View
-            val nodeIndex = parentNode!!.children!!.indexOf(tempNode)
-            if (nodeIndex == 0) parentNode.layoutConsumed = 0
-
-
-            val left = parentView.right + nodeHorSpace
-            val vCenter = parentView.top + parentView.measuredHeight / 2
-            val top = vCenter - (parentNode.placeHeight / 2) + parentNode.layoutConsumed
-
-            if (parentNode.selfHeight > parentNode.childrenHeight) {
-                var tempTop = vCenter - (parentNode.childrenHeight / 2) + parentNode.layoutConsumed
-                if (tempNode.placeHeight > tempNode.selfHeight) {
-                    tempTop += (tempNode.placeHeight - tempNode.selfHeight) / 2
-                }
-                tempView.layout(left, tempTop, left + tempView.measuredWidth, tempTop + tempView.measuredHeight)
-            }
-             else if (tempNode.placeHeight > tempNode.selfHeight) {
-                tempView.layout(
-                    left,
-                    top + (tempNode.placeHeight - tempNode.selfHeight) / 2,
-                    left + tempView.measuredWidth,
-                    top + (tempNode.placeHeight - tempNode.selfHeight) / 2 + tempView.measuredHeight
-                )
-            }
-            else tempView.layout(left, top, left + tempView.measuredWidth, top + tempView.measuredHeight)
-            parentNode.layoutConsumed += (if (nodeIndex != (parentNode.children!!.size - 1)) tempNode.placeHeight + nodeVerSpace else tempNode.placeHeight)
-
-            _tempQueue.addAll(tempNode.children ?: emptyList())
+    fun resetPosition() {
+        matrix.reset()
+        forEach {
+            it.pivotX = 0f
+            it.pivotY = 0f
+            it.scaleX = matrix.getValues(matrixValues).let { matrixValues }[Matrix.MSCALE_X]
+            it.scaleY = matrixValues[Matrix.MSCALE_Y]
+            it.translationX = matrixValues[Matrix.MTRANS_X]
+            it.translationY = matrixValues[Matrix.MTRANS_Y]
         }
     }
 
-    override fun onDraw(canvas: Canvas?) {
-        nodeLinePainter ?: return
-        val rootNode = adapter?.root ?: return
-        _cacheView[rootNode] ?: return
-        canvas ?: return
+    private fun resetCenterPoint(ev: MotionEvent) {
+        val x0 = ev.getX(0)
+        val y0 = ev.getY(0)
+        val x1 = ev.getX(1)
+        val y1 = ev.getY(1)
 
-        _tempQueue.addAll(rootNode.children ?: emptyList())
-        while (_tempQueue.isNotEmpty()) {
-            val tempNode = _tempQueue.pop()
-            val tempView = _cacheView[tempNode] as View
-            val parentNode = tempNode.parent
-            val parentView = _cacheView[parentNode] as View
+        scaleCenterPointer.x = x0 + (x1 - x0) / 2
+        scaleCenterPointer.y = y0 + (y1 - y0) / 2
 
-            nodeLinePainter!!.drawLine(canvas, tempView, parentView)
+        lastPointer0.x = x0
+        lastPointer0.y = y0
 
-            _tempQueue.addAll(tempNode.children ?: emptyList())
-        }
+        lastPointer1.x = x1
+        lastPointer1.y = y1
+
+        distanceBetweenPointer = lastPointer0.distance(lastPointer1).toFloat()
     }
 
-    inner class Observer : NodeAdapter.Observer {
-        override fun notifyChange() {
-            requestLayout()
-        }
+    private fun resetFlags() {
+        isScaling = false
+        isDragging = false
     }
 
 }

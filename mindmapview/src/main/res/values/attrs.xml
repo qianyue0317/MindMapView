@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <declare-styleable name="MindMapView">
+        <attr name="verSpace" format="dimension" />
+        <attr name="horSpace" format="dimension" />
+    </declare-styleable>
+</resources>

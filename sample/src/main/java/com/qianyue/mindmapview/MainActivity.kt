@@ -1,11 +1,13 @@
 package com.qianyue.mindmapview
 
 import android.graphics.Color
-import android.graphics.Matrix
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
-import android.util.Log
+import android.view.Gravity
 import android.view.View
+import android.view.ViewGroup.LayoutParams
+import android.widget.Button
+import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
@@ -21,11 +23,36 @@ class MainActivity : AppCompatActivity() {
         val adapter = MindAdapter()
         adapter.root = root
         val mindView = findViewById<MindMapView>(R.id.mind_map_view)
+        mindView.apply {
+            addView(
+                Button(this@MainActivity).apply {
+                    text = "重置"
+                    setOnClickListener {
+                        mindView.resetPosition()
+                    }
+                    setBackgroundColor(Color.YELLOW)
+                },
+                FrameLayout.LayoutParams(
+                    LayoutParams.WRAP_CONTENT,
+                    LayoutParams.WRAP_CONTENT,
+                    Gravity.END or Gravity.BOTTOM
+                ).apply {
+                    this.bottomMargin = 30
+                    this.marginEnd = 30
+                })
+        }
+        mindView.setAdapter(adapter)
+//        mindView.setContentGravity(Gravity.START)
 
-        mindView.adapter = adapter
+
+        val root2 = fakeData2()
+        val adapter2 = MindAdapter()
+        adapter2.root = root2
+        val mindContentView = findViewById<MindMapContentView>(R.id.mind_content_view)
+        mindContentView.adapter = adapter2
 
         mindView.postDelayed({
-            (mindView.parent as MindMapContainerView).resetPosition()
+//                             mindView.setVerSpace(60)
         }, 5000)
     }
 
@@ -60,7 +87,7 @@ class MainActivity : AppCompatActivity() {
         return root
     }
 
-    private fun fakeData2() :MindMapNode<String> {
+    private fun fakeData2(): MindMapNode<String> {
         val root = MindMapNode<String>("1111", null)
         val child1 = MindMapNode<String>("1-222", root)
         val child11 = MindMapNode<String>("1-222--111", child1)
@@ -102,17 +129,17 @@ class MainActivity : AppCompatActivity() {
                 (view as TextView).text = t
                 return view
             }
-           return TextView(this@MainActivity).apply {
-               textSize = 18f
-               setTextColor(Color.BLUE)
-               text = t
-               setPaddingRelative(16, 16, 16, 16)
-               setBackgroundColor(Color.GREEN)
+            return TextView(this@MainActivity).apply {
+                textSize = 18f
+                setTextColor(Color.BLUE)
+                text = t
+                setPaddingRelative(16, 16, 16, 16)
+                setBackgroundColor(Color.GREEN)
 
-               setOnClickListener {
-                   Toast.makeText(this@MainActivity, "这是:$t", Toast.LENGTH_SHORT).show()
-               }
-           }
+                setOnClickListener {
+                    Toast.makeText(this@MainActivity, "这是:$t", Toast.LENGTH_SHORT).show()
+                }
+            }
         }
     }
 }
