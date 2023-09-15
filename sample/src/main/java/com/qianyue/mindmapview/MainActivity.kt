@@ -24,9 +24,9 @@ class MainActivity : AppCompatActivity() {
 
         mindView.adapter = adapter
 
-//        mindView.postDelayed({
-//            adapter.root = fakeData2()
-//        }, 5000)
+        mindView.postDelayed({
+            (mindView.parent as MindMapContainerView).resetPosition()
+        }, 5000)
     }
 
     private fun fakeData(): MindMapNode<String> {

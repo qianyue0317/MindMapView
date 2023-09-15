@@ -2,6 +2,9 @@ package com.qianyue.mindmapview
 
 import android.graphics.Point
 import android.graphics.PointF
+import android.view.View
+import android.view.ViewGroup
+import androidx.core.view.forEach
 import kotlin.math.sqrt
 
 /**
@@ -22,8 +25,15 @@ fun Point.distance(otherX: Int, otherY: Int): Double {
 }
 
 
-
 fun PointF.distance(otherX: Float, otherY: Float): Double {
     return sqrt(((otherX - x) * (otherX - x) + (otherY - y) * (otherY - y)).toDouble())
 }
 
+fun ViewGroup.findChild(block: (View) -> Boolean): View? {
+    forEach {
+        if (block(it)) {
+            return it
+        }
+    }
+    return null
+}

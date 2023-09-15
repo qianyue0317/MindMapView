@@ -49,6 +49,13 @@ class MindMapContainerView @JvmOverloads constructor(
 
     private var distanceBetweenPointer = 0f
 
+    private var mindMapContentView: MindMapView? = null
+
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        ensureMindContent()
+    }
+
     override fun onInterceptTouchEvent(ev: MotionEvent?): Boolean {
         when (ev?.actionMasked ?: return false) {
             MotionEvent.ACTION_DOWN -> {
@@ -181,12 +188,12 @@ class MindMapContainerView @JvmOverloads constructor(
             }
         }
 
-        if (abs(offsetLR) > 0 || abs(offsetTB) > 0) forEach {
+        if (abs(offsetLR) > 0 || abs(offsetTB) > 0) mindMapContentView?.let {
             it.translationX += (offsetLR)
             it.translationY += (offsetTB)
         }
 
-        if (changeScale) forEach {
+        if (changeScale) mindMapContentView?.let {
             it.pivotX = 0f
             it.pivotY = 0f
             it.scaleX = matrix.getValues(matrixValues).let { matrixValues }[Matrix.MSCALE_X]
@@ -195,6 +202,24 @@ class MindMapContainerView @JvmOverloads constructor(
             it.translationY = matrixValues[Matrix.MTRANS_Y]
         }
         return true
+    }
+
+    private fun ensureMindContent() {
+        if (mindMapContentView == null) {
+            mindMapContentView = findChild { it is MindMapView } as MindMapView?
+        }
+    }
+
+    fun resetPosition() {
+        matrix.reset()
+        forEach {
+            it.pivotX = 0f
+            it.pivotY = 0f
+            it.scaleX = matrix.getValues(matrixValues).let { matrixValues }[Matrix.MSCALE_X]
+            it.scaleY = matrixValues[Matrix.MSCALE_Y]
+            it.translationX = matrixValues[Matrix.MTRANS_X]
+            it.translationY = matrixValues[Matrix.MTRANS_Y]
+        }
     }
 
     private fun resetCenterPoint(ev: MotionEvent) {

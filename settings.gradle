@@ -13,5 +13,5 @@ dependencyResolutionManagement {
     }
 }
 rootProject.name = "MindMapView"
-include ':app'
+include ':sample'
 include ':mindmapview'
