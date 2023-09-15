@@ -10,20 +10,19 @@ import kotlin.math.max
  */
 class MindMapNode<T>(val value: T, var parent: MindMapNode<T>?, var children: List<MindMapNode<T>>? = null, var expanded: Boolean = true) {
 
-    // 是算上间隙的距离
-
-    /**          ------- node   ↓
-     *          |               ↓
-     *          |               ↓
-     *          |
-     *  node ---             childrenHeight
-     *          |
-     *          |               ↑
-     *          |               ↑
-     *          -------- node   ↑
+    /**                              ------- node   ↓
+     *                              |               ↓
+     *                              |               ↓
+     * 子孙节点的总高度      node ---             childrenHeight
+     *                              |               ↑
+     *                              |               ↑
+     *                              -------- node   ↑
      */
     var childrenHeight: Int = 0
 
+    /**
+     * 节点自身的高度
+     */
     var selfHeight: Int = 0
 
     val placeHeight: Int get() = max(childrenHeight, selfHeight)

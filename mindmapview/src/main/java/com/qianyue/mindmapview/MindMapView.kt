@@ -2,12 +2,14 @@ package com.qianyue.mindmapview
 
 import android.content.Context
 import android.graphics.Canvas
+import android.graphics.Rect
 import android.util.AttributeSet
 import android.view.View
 import android.view.ViewGroup
 import com.qianyue.mindmapview.model.MindMapNode
 import com.qianyue.mindmapview.util.NodeAdapter
 import java.util.LinkedList
+import kotlin.math.max
 
 /**
  * @author QianYue
@@ -38,6 +40,11 @@ class MindMapView @JvmOverloads constructor(
 
     private val _cacheView: MutableMap<MindMapNode<*>, View> = mutableMapOf()
 
+    private val _mindContentRegion = Rect()
+
+    // 所有节点占的总大小，宽高
+    private val _mindContentSize = arrayOf(0, 0)
+
     var adapter: NodeAdapter<*>? = null
         set(value) {
             field = value
@@ -45,8 +52,22 @@ class MindMapView @JvmOverloads constructor(
         }
 
     var nodeVerSpace = context.resources.getDimensionPixelOffset(R.dimen.mind_map_node_ver_space)
+        set(value) {
+            val change = field != value
+            field = value
+            if (change) {
+                requestLayout()
+            }
+        }
 
     var nodeHorSpace = context.resources.getDimensionPixelOffset(R.dimen.mind_map_node_hor_space)
+        set(value) {
+            val change = field != value
+            field = value
+            if (change) {
+                requestLayout()
+            }
+        }
 
     var nodeLinePainter: NodeLinePainter? = DefaultLinePainter(context)
         set(value) {
@@ -58,13 +79,6 @@ class MindMapView @JvmOverloads constructor(
         }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        super.onMeasure(widthMeasureSpec, heightMeasureSpec)
-
-        val widthMode = MeasureSpec.getMode(widthMeasureSpec)
-        val widthSize = MeasureSpec.getSize(widthMeasureSpec)
-        val heightMode = MeasureSpec.getMode(heightMeasureSpec)
-        val heightSize = MeasureSpec.getSize(heightMeasureSpec)
-
         removeAllViews()
 
         adapter ?: return
@@ -78,16 +92,14 @@ class MindMapView @JvmOverloads constructor(
         var currentLevel = -1
         var posIndexInLevel = -1
         var currentParent: MindMapNode<*>? = null
-//        var childrenHeight = 0
+
+        var expectedWidth = 0
 
         _tempQueue.offer(rootNode)
 
         while (_tempQueue.isNotEmpty()) {
             val tempNode = _tempQueue.pop()
             tempNode.reset()
-//            if (tempNode.parent != currentParent) {
-//                childrenHeight = 0
-//            }
             currentParent = tempNode.parent
             tempNode.level = tempNode.parent?.let { it.level + 1 } ?: 0
             if (tempNode.level != currentLevel) posIndexInLevel = 0 else posIndexInLevel++
@@ -132,23 +144,45 @@ class MindMapView @JvmOverloads constructor(
                 }
             }
 
+            // <editor-fold desc="测出导图内容宽度">
+            if (tempNode.isLeaf()) {
+                var node = tempNode
+                var width = 0
+                while (node != null) {
+                    width += (_cacheView[node]!!.measuredWidth + nodeHorSpace)
+                    node = node.parent
+                }
+                width -= nodeHorSpace
+                expectedWidth = max(width, expectedWidth)
+            }
+            // </editor-fold>
+
             tempNode.children?.takeIf { it.isNotEmpty() }?.let { _tempQueue.addAll(it) }
         }
+
+        _mindContentSize[0] = expectedWidth
+        _mindContentSize[1] = rootNode.placeHeight
+        super.onMeasure(MeasureSpec.makeMeasureSpec(_mindContentSize[0], MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(_mindContentSize[1], MeasureSpec.EXACTLY))
     }
+
+
 
     override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) {
         val vCenter = measuredHeight / 2
         val hCenter = measuredWidth / 2
+
+        // TODO: 还没有处理padding
 
         _tempQueue.clear()
 
         val rootNode = adapter?.root ?: return
         val rootView = _cacheView[rootNode] ?: return
         // 根节点
+        val rootLeft = (measuredWidth - _mindContentSize[0]) / 2
         rootView.layout(
-            paddingLeft,
+            rootLeft,
             vCenter - rootView.measuredHeight / 2,
-            rootView.measuredWidth + paddingLeft,
+            rootLeft + rootView.measuredWidth,
             vCenter + rootView.measuredHeight / 2
         )
 
@@ -189,8 +223,9 @@ class MindMapView @JvmOverloads constructor(
     }
 
     override fun onDraw(canvas: Canvas?) {
+        nodeLinePainter ?: return
         val rootNode = adapter?.root ?: return
-        val rootView = _cacheView[rootNode] ?: return
+        _cacheView[rootNode] ?: return
         canvas ?: return
 
         _tempQueue.addAll(rootNode.children ?: emptyList())
@@ -200,7 +235,7 @@ class MindMapView @JvmOverloads constructor(
             val parentNode = tempNode.parent
             val parentView = _cacheView[parentNode] as View
 
-            nodeLinePainter?.drawLine(canvas, tempView, parentView)
+            nodeLinePainter!!.drawLine(canvas, tempView, parentView)
 
             _tempQueue.addAll(tempNode.children ?: emptyList())
         }
