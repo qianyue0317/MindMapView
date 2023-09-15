@@ -13,7 +13,9 @@
         android:layout_height="0dp"
         android:layout_weight="1"
         android:background="#7EE6B1"
-        app:verSpace="3dp" />
+        android:padding="16dp"
+        app:verSpace="24dp"
+        app:horSpace="40dp"/>
 
     <com.qianyue.mindmapview.MindMapContentView
         android:id="@+id/mind_content_view"

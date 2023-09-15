@@ -26,9 +26,9 @@ class MainActivity : AppCompatActivity() {
         mindView.apply {
             addView(
                 Button(this@MainActivity).apply {
-                    text = "重置"
+                    text = "fitCenter"
                     setOnClickListener {
-                        mindView.resetPosition()
+                        mindView.fitCenter()
                     }
                     setBackgroundColor(Color.YELLOW)
                 },
@@ -42,8 +42,10 @@ class MainActivity : AppCompatActivity() {
                 })
         }
         mindView.setAdapter(adapter)
+        // 设置Gravity
 //        mindView.setContentGravity(Gravity.START)
-
+        // 设置缩放到父容器大小，类似ImageView的 FIT_CENTER
+//        mindView.fitCenter()
 
         val root2 = fakeData2()
         val adapter2 = MindAdapter()
@@ -51,9 +53,9 @@ class MainActivity : AppCompatActivity() {
         val mindContentView = findViewById<MindMapContentView>(R.id.mind_content_view)
         mindContentView.adapter = adapter2
 
-        mindView.postDelayed({
-//                             mindView.setVerSpace(60)
-        }, 5000)
+//        mindView.postDelayed({
+//                             mindView.fitScale()
+//        }, 5000)
     }
 
     private fun fakeData(): MindMapNode<String> {

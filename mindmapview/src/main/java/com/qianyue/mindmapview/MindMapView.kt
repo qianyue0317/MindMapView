@@ -60,6 +60,8 @@ class MindMapView @JvmOverloads constructor(
         )
     }
 
+    var enableTouch: Boolean = true
+
     fun setHorSpace(horSpace: Int) {
         mindMapContentView.nodeHorSpace = horSpace
     }
@@ -71,6 +73,9 @@ class MindMapView @JvmOverloads constructor(
     var maxScaleFactor = 3f
 
     var minScaleFactor = 0.2f
+
+    // 使导图控件正好填充此容器，需要缩放的因子
+    private var fitScaleFactor = -1f
 
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
 
@@ -100,7 +105,37 @@ class MindMapView @JvmOverloads constructor(
         }
     }
 
+    fun fitCenter() {
+        val fitScaleRun = {
+            // 要自适应缩放必须设置Gravity为Center
+            setContentGravity(Gravity.CENTER)
+
+            matrix.getValues(matrixValues)
+            matrix.setScale(
+                fitScaleFactor,
+                fitScaleFactor,
+                mindMapContentView.measuredWidth / 2f,
+                mindMapContentView.measuredHeight / 2f
+            )
+            mindMapContentView.pivotX = 0f
+            mindMapContentView.pivotY = 0f
+            mindMapContentView.scaleX =
+                matrix.getValues(matrixValues).let { matrixValues }[Matrix.MSCALE_X]
+            mindMapContentView.scaleY = matrixValues[Matrix.MSCALE_Y]
+            mindMapContentView.translationX = matrixValues[Matrix.MTRANS_X]
+            mindMapContentView.translationY = matrixValues[Matrix.MTRANS_Y]
+        }
+        if (fitScaleFactor < 0) {
+            // 还没有测量
+            post {
+                fitScaleRun()
+            }
+        } else fitScaleRun()
+
+    }
+
     override fun onInterceptTouchEvent(ev: MotionEvent?): Boolean {
+        if (!enableTouch) return false
         when (ev?.actionMasked ?: return false) {
             MotionEvent.ACTION_DOWN -> {
                 downPoint.x = ev.x
@@ -135,8 +170,17 @@ class MindMapView @JvmOverloads constructor(
         return false
     }
 
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+        fitScaleFactor = min(
+            (measuredHeight - paddingTop - paddingBottom) / mindMapContentView.measuredHeight.toFloat(),
+            (measuredWidth- paddingStart - paddingEnd) / mindMapContentView.measuredWidth .toFloat()
+        )
+    }
+
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(ev: MotionEvent?): Boolean {
+        if (!enableTouch) return false
         var offsetLR = 0f
         var offsetTB = 0f
         var changeScale = false
