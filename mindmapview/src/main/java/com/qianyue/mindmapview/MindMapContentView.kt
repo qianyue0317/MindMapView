@@ -9,7 +9,6 @@ import android.view.ViewGroup
 import com.qianyue.mindmapview.model.MindMapNode
 import com.qianyue.mindmapview.util.NodeAdapter
 import java.util.LinkedList
-import kotlin.math.max
 
 /**
  * 真正的摆放节点的视图
@@ -43,26 +42,46 @@ class MindMapContentView @JvmOverloads constructor(
             }
         }
 
+    var layoutStrategy: NodeLayoutStrategy? = null
+        set(value) {
+            value?.init(layoutHelper)
+            field = value
+            requestLayout()
+        }
+
+    private val layoutHelper: LayoutHelper = object :LayoutHelper {
+        override val horSpace: Int
+            get() = (this@MindMapContentView).nodeHorSpace
+        override val verSpace: Int
+            get() = (this@MindMapContentView).nodeVerSpace
+        override val adapter: NodeAdapter<*>?
+            get() = (this@MindMapContentView).adapter
+        override val container: MindMapContentView
+            get() = this@MindMapContentView
+
+        override fun getCachedView(node: MindMapNode<*>): View? {
+            return _cacheView[node]
+        }
+
+        override fun cacheView(node: MindMapNode<*>, view: View) {
+            _cacheView[node] = view
+        }
+    }
+
     init {
         setWillNotDraw(false)
 
         attributeSet?.apply {
             val typedArray = context.obtainStyledAttributes(attributeSet, R.styleable.MindMapView)
-            nodeHorSpace = typedArray.getDimensionPixelOffset(R.styleable.MindMapView_horSpace, nodeHorSpace)
-            nodeVerSpace = typedArray.getDimensionPixelOffset(R.styleable.MindMapView_verSpace, nodeVerSpace)
+            nodeHorSpace =
+                typedArray.getDimensionPixelOffset(R.styleable.MindMapView_horSpace, nodeHorSpace)
+            nodeVerSpace =
+                typedArray.getDimensionPixelOffset(R.styleable.MindMapView_verSpace, nodeVerSpace)
             typedArray.recycle()
         }
-    }
 
-    companion object {
-        // 摆放在左侧
-        const val MODE_LEFT = 1
-
-        // 摆放在右侧
-        const val MODE_RIGHT = 2
-
-        // 摆放在两侧
-        const val MODE_BOTH = 3
+        layoutStrategy = RightLayoutStrategy()
+//        setBackgroundColor(Color.YELLOW)
     }
 
     private val _tempQueue: LinkedList<MindMapNode<*>> = LinkedList()
@@ -91,149 +110,25 @@ class MindMapContentView @JvmOverloads constructor(
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         super.onMeasure(widthMeasureSpec, heightMeasureSpec)
 
+        layoutStrategy ?: return
+
         removeAllViews()
 
-        adapter ?: return
-        adapter!!.root ?: return
-
-        _tempQueue.clear()
-
-        // 测量子节点
-        val rootNode = adapter!!.root!!
-        rootNode.leftOrRight = 0
-        var currentLevel = -1
-        var posIndexInLevel = -1
-        var currentParent: MindMapNode<*>?
-
-        var expectedWidth = 0
-
-        _tempQueue.offer(rootNode)
-
-        while (_tempQueue.isNotEmpty()) {
-            val tempNode = _tempQueue.pop()
-            tempNode.reset()
-            currentParent = tempNode.parent
-            tempNode.level = tempNode.parent?.let { it.level + 1 } ?: 0
-            if (tempNode.level != currentLevel) posIndexInLevel = 0 else posIndexInLevel++
-            currentLevel = tempNode.level
-            tempNode.posInLevel = posIndexInLevel
-            if (tempNode.level == 0 && tempNode != rootNode) {
-                // 只有根节点的root可空
-                throw RuntimeException("only root node's parent field can be null")
-            }
-
-
-            // TODO: 展开收起处理
-//            if (!tempNode.expanded) continue0
-
-            val view =
-                adapter!!.getView(_cacheView[tempNode], currentLevel, posIndexInLevel, tempNode)
-                    .also { _cacheView[tempNode] = it }
-            view.setTag(R.id.mind_node_tag, tempNode)
-            view.measure(
-                MeasureSpec.makeMeasureSpec(Int.MAX_VALUE shr 2, MeasureSpec.AT_MOST),
-                MeasureSpec.makeMeasureSpec(Int.MAX_VALUE shr 2, MeasureSpec.AT_MOST),
-            )
-            tempNode.selfHeight = view.measuredHeight
-            view.visibility = if (tempNode.isExpanded()) View.VISIBLE else View.GONE
-            addView(view)
-
-            currentParent?.let {
-                it.childrenHeight += (tempNode.placeHeight + nodeVerSpace)
-                tempNode.saveOldPlaceHeight()
-                if (it.children!!.last() == tempNode) {
-                    it.childrenHeight -= nodeVerSpace
-
-                    var tempParent = it.parent
-                    var tempChild = it
-                    while (tempParent != null) {
-                        tempParent.childrenHeight -= tempChild.oldPlaceHeight
-                        tempParent.childrenHeight += tempChild.placeHeight
-                        tempChild.saveOldPlaceHeight()
-                        tempChild = tempParent
-                        tempParent = tempParent.parent
-                    }
-                }
-            }
-
-            // <editor-fold desc="测出导图内容宽度">
-            if (tempNode.isLeaf()) {
-                var node = tempNode
-                var width = 0
-                while (node != null) {
-                    width += (_cacheView[node]!!.measuredWidth + nodeHorSpace)
-                    node = node.parent
-                }
-                width -= nodeHorSpace
-                expectedWidth = max(width, expectedWidth)
-            }
-            // </editor-fold>
-
-            tempNode.children?.takeIf { it.isNotEmpty() }?.let { _tempQueue.addAll(it) }
+        val result: Long = layoutStrategy!!.onMeasure()
+        if (result == 0L) {
+            return
         }
 
-        _mindContentSize[0] = expectedWidth
-        _mindContentSize[1] = rootNode.placeHeight
         // 尺寸完全自适应，节点占多少，自身就占多少
-        super.onMeasure(MeasureSpec.makeMeasureSpec(_mindContentSize[0], MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(_mindContentSize[1], MeasureSpec.EXACTLY))
+        super.onMeasure(
+            result.shr(32).toInt(),
+            result.toInt()
+        )
     }
 
 
-
     override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) {
-
-        val vCenter = measuredHeight / 2
-        val hCenter = measuredWidth / 2
-
-        // TODO: 还没有处理padding
-
-        _tempQueue.clear()
-
-        val rootNode = adapter?.root ?: return
-        val rootView = _cacheView[rootNode] ?: return
-        // 根节点
-        val rootLeft = (measuredWidth - _mindContentSize[0]) / 2
-        rootView.layout(
-            rootLeft,
-            vCenter - rootView.measuredHeight / 2,
-            rootLeft + rootView.measuredWidth,
-            vCenter + rootView.measuredHeight / 2
-        )
-
-        _tempQueue.addAll(rootNode.children ?: emptyList())
-        while (_tempQueue.isNotEmpty()) {
-            val tempNode = _tempQueue.pop()
-            val tempView = _cacheView[tempNode] as View
-            val parentNode = tempNode.parent
-            val parentView = _cacheView[parentNode] as View
-            val nodeIndex = parentNode!!.children!!.indexOf(tempNode)
-            if (nodeIndex == 0) parentNode.layoutConsumed = 0
-
-
-            val left = parentView.right + nodeHorSpace
-            val vCenter = parentView.top + parentView.measuredHeight / 2
-            val top = vCenter - (parentNode.placeHeight / 2) + parentNode.layoutConsumed
-
-            if (parentNode.selfHeight > parentNode.childrenHeight) {
-                var tempTop = vCenter - (parentNode.childrenHeight / 2) + parentNode.layoutConsumed
-                if (tempNode.placeHeight > tempNode.selfHeight) {
-                    tempTop += (tempNode.placeHeight - tempNode.selfHeight) / 2
-                }
-                tempView.layout(left, tempTop, left + tempView.measuredWidth, tempTop + tempView.measuredHeight)
-            }
-             else if (tempNode.placeHeight > tempNode.selfHeight) {
-                tempView.layout(
-                    left,
-                    top + (tempNode.placeHeight - tempNode.selfHeight) / 2,
-                    left + tempView.measuredWidth,
-                    top + (tempNode.placeHeight - tempNode.selfHeight) / 2 + tempView.measuredHeight
-                )
-            }
-            else tempView.layout(left, top, left + tempView.measuredWidth, top + tempView.measuredHeight)
-            parentNode.layoutConsumed += (if (nodeIndex != (parentNode.children!!.size - 1)) tempNode.placeHeight + nodeVerSpace else tempNode.placeHeight)
-
-            _tempQueue.addAll(tempNode.children ?: emptyList())
-        }
+        layoutStrategy?.onLayout()
     }
 
     override fun onDraw(canvas: Canvas?) {
@@ -261,4 +156,13 @@ class MindMapContentView @JvmOverloads constructor(
         }
     }
 
+
+    interface LayoutHelper {
+        val horSpace: Int
+        val verSpace: Int
+        val adapter: NodeAdapter<*>?
+        val container: MindMapContentView
+        fun getCachedView(node: MindMapNode<*>): View?
+        fun cacheView(node: MindMapNode<*>, view: View)
+    }
 }

@@ -72,6 +72,8 @@ class MainActivity : AppCompatActivity() {
 
         val child2 = MindMapNode<String>("1-333", root)
         val child21 = MindMapNode<String>("2-222--111", child2)
+        child21.children = listOf(MindMapNode("2-222-111-111", child21))
+
         val child22 = MindMapNode<String>("2-222--222", child2)
         child2.children = listOf(child21, child22)
 
@@ -126,14 +128,11 @@ class MainActivity : AppCompatActivity() {
 
     inner class MindAdapter : NodeAdapter<String>() {
         override fun getView(view: View?, level: Int, posInLevel: Int, t: String): View {
+            if (view != null) return view
             if (level == 2 && posInLevel == 2) {
                 return ImageView(this@MainActivity).apply {
                     setImageResource(R.mipmap.ic_launcher)
                 }
-            }
-            if (view != null) {
-                (view as TextView).text = t
-                return view
             }
             return TextView(this@MainActivity).apply {
                 textSize = 18f
