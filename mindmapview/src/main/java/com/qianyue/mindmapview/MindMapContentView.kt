@@ -6,7 +6,9 @@ import android.graphics.Canvas
 import android.util.AttributeSet
 import android.view.View
 import android.view.ViewGroup
+import com.qianyue.mindmapview.layoutstrategy.RightLayoutStrategy
 import com.qianyue.mindmapview.model.MindMapNode
+import com.qianyue.mindmapview.nodelinepainter.DefaultLinePainter
 import com.qianyue.mindmapview.util.NodeAdapter
 import java.util.LinkedList
 
@@ -49,6 +51,16 @@ class MindMapContentView @JvmOverloads constructor(
             requestLayout()
         }
 
+
+    var nodeLinePainter: NodeLinePainter? = null
+        set(value) {
+            val change = field != value
+            field = value
+            if (change) {
+                invalidate()
+            }
+        }
+
     private val layoutHelper: LayoutHelper = object :LayoutHelper {
         override val horSpace: Int
             get() = (this@MindMapContentView).nodeHorSpace
@@ -81,6 +93,7 @@ class MindMapContentView @JvmOverloads constructor(
         }
 
         layoutStrategy = RightLayoutStrategy()
+        nodeLinePainter = DefaultLinePainter(context)
 //        setBackgroundColor(Color.YELLOW)
     }
 
@@ -95,16 +108,6 @@ class MindMapContentView @JvmOverloads constructor(
         set(value) {
             field = value
             value?.observer = Observer()
-        }
-
-
-    var nodeLinePainter: NodeLinePainter? = DefaultLinePainter(context)
-        set(value) {
-            val change = field != value
-            field = value
-            if (change) {
-                invalidate()
-            }
         }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {

@@ -11,7 +11,11 @@ import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
+import com.qianyue.mindmapview.layoutstrategy.BothSideLayoutStrategy
+import com.qianyue.mindmapview.layoutstrategy.RightLayoutStrategy
 import com.qianyue.mindmapview.model.MindMapNode
+import com.qianyue.mindmapview.nodelinepainter.BothSideLinePainter
+import com.qianyue.mindmapview.nodelinepainter.DefaultLinePainter
 import com.qianyue.mindmapview.util.NodeAdapter
 
 class MainActivity : AppCompatActivity() {
@@ -39,6 +43,41 @@ class MainActivity : AppCompatActivity() {
                 ).apply {
                     this.bottomMargin = 30
                     this.marginEnd = 30
+                })
+
+            addView(
+                Button(this@MainActivity).apply {
+                    text = "两侧摆放"
+                    setOnClickListener {
+                        mindView.setLayoutStrategy(BothSideLayoutStrategy())
+                        mindView.setNodeLinePainter(BothSideLinePainter(context))
+                    }
+                    setBackgroundColor(Color.YELLOW)
+                },
+                FrameLayout.LayoutParams(
+                    LayoutParams.WRAP_CONTENT,
+                    LayoutParams.WRAP_CONTENT,
+                    Gravity.END or Gravity.BOTTOM
+                ).apply {
+                    this.bottomMargin = 30
+                    this.marginEnd = 400
+                })
+
+            addView(Button(this@MainActivity).apply {
+                text = "右侧摆放"
+                setOnClickListener {
+                    mindView.setLayoutStrategy(RightLayoutStrategy())
+                    mindView.setNodeLinePainter(DefaultLinePainter(context))
+                }
+                setBackgroundColor(Color.YELLOW)
+            },
+                FrameLayout.LayoutParams(
+                    LayoutParams.WRAP_CONTENT,
+                    LayoutParams.WRAP_CONTENT,
+                    Gravity.END or Gravity.BOTTOM
+                ).apply {
+                    this.bottomMargin = 30
+                    this.marginEnd = 800
                 })
         }
         mindView.setAdapter(adapter)
@@ -91,7 +130,16 @@ class MainActivity : AppCompatActivity() {
 
         child3.children = listOf(child31, child32)
 
-        root.children = listOf(child1, child2, child3)
+
+        // 换行测试
+        val child4 = MindMapNode<String>("4-111--222", root)
+        val child41 = MindMapNode<String>("4-444--111", child4)
+        val child42 = MindMapNode<String>("4-444--222", child4)
+
+        child4.children = listOf(child41, child42)
+
+
+        root.children = listOf(child1, child2, child3, child4)
         return root
     }
 
@@ -139,7 +187,7 @@ class MainActivity : AppCompatActivity() {
                 setTextColor(Color.BLUE)
                 text = t
                 setPaddingRelative(16, 16, 16, 16)
-                setBackgroundColor(Color.GREEN)
+                setBackgroundColor(if (level == 0 && posInLevel == 0) Color.RED else Color.GREEN)
 
                 setOnClickListener {
                     Toast.makeText(this@MainActivity, "这是:$t", Toast.LENGTH_SHORT).show()

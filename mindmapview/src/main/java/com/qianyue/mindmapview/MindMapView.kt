@@ -70,6 +70,14 @@ class MindMapView @JvmOverloads constructor(
         mindMapContentView.nodeVerSpace = verSpace
     }
 
+    fun setLayoutStrategy(layoutStrategy: NodeLayoutStrategy) {
+        mindMapContentView.layoutStrategy = layoutStrategy
+    }
+
+    fun setNodeLinePainter(nodeLinePainter: NodeLinePainter) {
+        mindMapContentView.nodeLinePainter = nodeLinePainter
+    }
+
     var maxScaleFactor = 3f
 
     var minScaleFactor = 0.2f

@@ -1,10 +1,12 @@
-package com.qianyue.mindmapview
+package com.qianyue.mindmapview.nodelinepainter
 
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
 import android.view.View
+import com.qianyue.mindmapview.NodeLinePainter
+import com.qianyue.mindmapview.R
 
 /**
  * @author QianYue
