@@ -290,8 +290,8 @@ class MindMapView @JvmOverloads constructor(
         }
 
         if (changeScale) mindMapContentView.let {
-            it.pivotX = 0f
-            it.pivotY = 0f
+            it.pivotX = -it.left.toFloat()
+            it.pivotY = -it.top.toFloat()
             it.scaleX = matrix.getValues(matrixValues).let { matrixValues }[Matrix.MSCALE_X]
             it.scaleY = matrixValues[Matrix.MSCALE_Y]
             it.translationX = matrixValues[Matrix.MTRANS_X]
