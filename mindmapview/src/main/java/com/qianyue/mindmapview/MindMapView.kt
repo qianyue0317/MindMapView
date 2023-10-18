@@ -71,6 +71,12 @@ class MindMapView @JvmOverloads constructor(
     }
 
     fun setLayoutStrategy(layoutStrategy: NodeLayoutStrategy) {
+        matrix.reset()
+        mindMapContentView.scaleX = 1f
+        mindMapContentView.scaleY = 1f
+        mindMapContentView.translationX = 0f
+        mindMapContentView.translationY = 0f
+//        invalidate()
         mindMapContentView.layoutStrategy = layoutStrategy
     }
 
@@ -117,18 +123,17 @@ class MindMapView @JvmOverloads constructor(
         val fitScaleRun = {
             // 要自适应缩放必须设置Gravity为Center
             setContentGravity(Gravity.CENTER)
-
-            matrix.getValues(matrixValues)
-            matrix.setScale(
+            matrix.reset()
+            matrix.postScale(
                 fitScaleFactor,
                 fitScaleFactor,
-                mindMapContentView.measuredWidth / 2f,
-                mindMapContentView.measuredHeight / 2f
+                measuredWidth / 2f,
+                measuredHeight / 2f
             )
-            mindMapContentView.pivotX = 0f
-            mindMapContentView.pivotY = 0f
-            mindMapContentView.scaleX =
-                matrix.getValues(matrixValues).let { matrixValues }[Matrix.MSCALE_X]
+            matrix.getValues(matrixValues)
+            mindMapContentView.pivotX = -mindMapContentView.left.toFloat()
+            mindMapContentView.pivotY = -mindMapContentView.top.toFloat()
+            mindMapContentView.scaleX = matrixValues[Matrix.MSCALE_X]
             mindMapContentView.scaleY = matrixValues[Matrix.MSCALE_Y]
             mindMapContentView.translationX = matrixValues[Matrix.MTRANS_X]
             mindMapContentView.translationY = matrixValues[Matrix.MTRANS_Y]
@@ -303,8 +308,8 @@ class MindMapView @JvmOverloads constructor(
     fun resetPosition() {
         matrix.reset()
         forEach {
-            it.pivotX = 0f
-            it.pivotY = 0f
+            it.pivotX = -mindMapContentView.left.toFloat()
+            it.pivotY = -mindMapContentView.top.toFloat()
             it.scaleX = matrix.getValues(matrixValues).let { matrixValues }[Matrix.MSCALE_X]
             it.scaleY = matrixValues[Matrix.MSCALE_Y]
             it.translationX = matrixValues[Matrix.MTRANS_X]
